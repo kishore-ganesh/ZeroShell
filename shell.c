@@ -12,6 +12,7 @@
 
 char *defaultPaths[] = {"/usr/bin/", "/bin/"};
 int numberOfPaths = 2;
+int logComm = 0, logInt = 0;
 int checkIfFileExists(char *path, char *name)
 {
 	DIR *directory = opendir(path);
@@ -112,23 +113,98 @@ void executeProgramList(char *programs[], int index, int numberOfPrograms, char 
 	recursiveExecutor(programs, index, numberOfPrograms, fd, argumentList);
 }
 
-// else
-// {
-// 	// close(0);
-// 	// dup(fd[index][0]);
+int getTokens(char *tokens[256], char *command)
+{
+	tokens[0] = strtok(command, " ");
+	int i = 1;
+	while ((tokens[i++] = strtok(NULL, " ")) != NULL)
+		;
+	i--;
+	return i;
+}
 
-// 	// 	//check indexe
-// 	// 	execlp(findFullPath(programs[index+1], sources, numberOfPaths));
-// }
+void processCommand(char *command)
+{
+	char *tokens[256] = {0};
+	int i = getTokens(tokens, command);
+	int argscount = 0, pipedcount = 0, filecount = 0;
 
-// else
-// {
+	for (int j = 1; j < i; j++)
+	{
+		if (tokens[j][0] == '-')
+		{
+			argscount++;
+		}
 
-// 	if (numberOfPrograms >= 2)
-// 	{
-// 		execlp(findFullPath(programs[index + 1]))
-// 	}
-// }
+		else if (tokens[j][0] == '|')
+		{
+			pipedcount++;
+		}
+
+		else if (strcmp(tokens[j], ">>") == 0)
+		{
+			filecount++;
+		}
+
+		else
+		{
+			argscount++;
+		}
+	}
+
+	//have separate argument list for each
+	char **args[pipedcount + 1];
+	char **pipedprograms = (char **)malloc((pipedcount + 1) * sizeof(char *));
+	char **redirectedfiles = (char **)malloc(filecount * sizeof(char *));
+	for (int i = 0; i < pipedcount + 1; i++)
+	{
+		args[i] = (char **)malloc((MAXARGS) * sizeof(char *));
+		// memcpy(args[i], NULL, MAXARGS * sizeof(char *));
+		for(int j=0; j< MAXARGS; j++)
+		{
+			args[i][j] = NULL;
+		}
+	}
+
+	int pipedindex = 0, fileindex = 0, currentProgramIndex = 0;
+	int argsindex[pipedcount + 1];
+
+	for (int i = 0; i < pipedcount + 1; i++)
+	{
+		argsindex[i] = 0;
+	}
+
+	args[0][argsindex[0]++] = tokens[0];
+	pipedprograms[pipedindex++] = tokens[0];
+	for (int j = 1; j < i; j++)
+	{
+		if (tokens[j][0] == '-')
+		{
+			args[currentProgramIndex][argsindex[currentProgramIndex]++] = tokens[j];
+		}
+		else if (tokens[j][0] == '|')
+		{
+			pipedprograms[pipedindex] = tokens[j + 1];
+			currentProgramIndex = pipedindex;
+			args[currentProgramIndex][argsindex[currentProgramIndex]++] = tokens[j + 1];
+			pipedindex++;
+			j++;
+		}
+
+		else if (strcmp(tokens[j], ">>") == 0)
+		{
+			redirectedfiles[fileindex++] = tokens[j + 1];
+			j++;
+		}
+
+		else
+		{
+			args[currentProgramIndex][argsindex[currentProgramIndex]++] = tokens[j];
+		}
+	}
+
+	executeProgramList(pipedprograms, pipedindex - 1, pipedindex, args);
+}
 
 int main()
 {
@@ -156,92 +232,7 @@ int main()
 
 		else
 		{
-			char *tokens[256] = {0};
-			tokens[0] = strtok(command, " ");
-			int i = 1, argscount = 0, pipedcount = 0, filecount = 0;
-			while ((tokens[i++] = strtok(NULL, " ")) != NULL)
-				;
-			i--;
-
-			for (int j = 1; j < i; j++)
-			{
-				if (tokens[j][0] == '-')
-				{
-					argscount++;
-				}
-
-				else if (tokens[j][0] == '|')
-				{
-					pipedcount++;
-				}
-
-				else if (strcmp(tokens[j], ">>") == 0)
-				{
-					filecount++;
-				}
-
-				else
-				{
-					argscount++;
-				}
-			}
-
-			//have separate argument list for each
-			// char **args = (char **)malloc((argscount + 2) * sizeof(char *));
-			char **args[pipedcount + 1];
-
-			for (int i = 0; i < pipedcount + 1; i++)
-			{
-				args[i] = (char **)malloc((MAXARGS) * sizeof(char *));
-				for (int j = 0; j < MAXARGS; j++)
-				{
-					args[i][j] = NULL;
-
-					//Usign memcpy will be faster
-				}
-			}
-			// args[argscount + 1] = NULL;
-			char **pipedprograms = (char **)malloc((pipedcount + 1) * sizeof(char *));
-			char **redirectedfiles = (char **)malloc(filecount * sizeof(char *));
-			int pipedindex = 0, fileindex = 0, currentProgramIndex = 0;
-			int argsindex[pipedcount + 1];
-
-			for (int i = 0; i < pipedcount + 1; i++)
-			{
-				argsindex[i] = 0;
-			}
-
-			args[0][argsindex[0]++] = tokens[0];
-			pipedprograms[pipedindex++] = tokens[0];
-			for (int j = 1; j < i; j++)
-			{
-				if (tokens[j][0] == '-')
-				{
-					args[currentProgramIndex][argsindex[currentProgramIndex]++] = tokens[j];
-				}
-				else if (tokens[j][0] == '|')
-				{
-					pipedprograms[pipedindex] = tokens[j + 1];
-					currentProgramIndex = pipedindex;
-					args[currentProgramIndex][argsindex[currentProgramIndex]++] = tokens[j + 1];
-					pipedindex++;
-					j++;
-				}
-
-				else if (strcmp(tokens[j], ">>") == 0)
-				{
-					redirectedfiles[fileindex++] = tokens[j + 1];
-					j++;
-				}
-
-				else
-				{
-					args[currentProgramIndex][argsindex[currentProgramIndex]++] = tokens[j];
-				}
-			}
-
-			// printf("PATH IS: %s\n", findFullPath(tokens[0], defaultPaths, numberOfPaths));
-			executeProgramList(pipedprograms, pipedindex - 1, pipedindex, args);
+			processCommand(command);
 			// if (fork() == 0)
 			// {
 
@@ -262,4 +253,5 @@ int main()
 	//Fix gcc error
 	//Grep not working currently because we aren't passing arguments
 	//Improve tokenization
+	//Process both pipe and redirection together
 }
