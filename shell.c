@@ -5,6 +5,7 @@
 #include <string.h>
 #include <sys/wait.h>
 #include <dirent.h>
+#include<fcntl.h>
 
 #define MAXARGS 128
 
@@ -72,6 +73,41 @@ void recursiveExecutor(char *programs[], int index, int numberOfPrograms, int fd
 		{
 
 			recursiveExecutor(programs, index - 1, numberOfPrograms, fd, argumentList);
+			if(logInt)
+			{
+				int logIntFD = open("LogInt.txt", O_APPEND|O_CREAT);
+				
+				char s[512];
+				s[0]='\0';
+				for(int i=0; i<=index; i++)
+				{
+					
+					if(index>0)
+					{
+						strcat(s, "|");
+					}
+					strcat(s, programs[i]);
+				}
+
+				write(logIntFD, s, strlen(s)+1);
+				char b;
+				int t_p[2];
+				pipe(t_p);
+				close(fd[index - 1][1]);
+				while(read(fd[index-1][0], &b, sizeof(b))>0)
+				{
+					
+					write(logIntFD, &b, sizeof(b));
+					printf("%c", b);
+					write(t_p[1], &b, sizeof(b));
+				}
+
+				printf("ENDED READING PIPE\n");
+
+				fd[index-1][0] = t_p[0];
+				fd[index-1][1] = t_p[1];
+
+			}
 			close(0);
 			dup(fd[index - 1][0]);
 			close(fd[index - 1][1]);
@@ -221,10 +257,14 @@ int main()
 
 		else if (strcmp("LOGINT", command) == 0)
 		{
+			printf("STARTED LOGGING\n");
+			logInt = 1;
 		}
 
 		else if (strcmp("UNLOGINT", command) == 0)
 		{
+			printf("ENDED LOGGING\n");
+			logInt = 0;
 		}
 		else if (strcmp("UNLOGCOMM", command) == 0)
 		{
@@ -254,4 +294,5 @@ int main()
 	//Grep not working currently because we aren't passing arguments
 	//Improve tokenization
 	//Process both pipe and redirection together
+	//Fix input bug
 }
