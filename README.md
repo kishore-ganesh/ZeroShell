@@ -5,7 +5,7 @@ Current status:
 
 1. ZeroShell is able to execute most Linux commands, and piping is working fine. Just like the traditional Bash shell, you can pipe any number of programs any number of times.
 
-2. File redirection is currently being worked on. Logging support will also be added soon.
+2. File redirection is currently being worked on. ~~Logging support will also be added soon.~~ Logging support has been added, and will save the intermediate values of pipe commands (except for last one) to a file named LogInt.txt. If the command is "ls | wc | wc", it will save the output of ls and ls | wc, but not ls | wc | wc. This small bug will be fixed soon.
 
 3. There are also plans to integrate signals into the system to allow Ctrl-C'ing and killing processes.
 
