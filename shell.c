@@ -5,8 +5,8 @@
 #include <string.h>
 #include <sys/wait.h>
 #include <dirent.h>
-#include<fcntl.h>
-#include<errno.h>
+#include <fcntl.h>
+#include <errno.h>
 #define MAXARGS 128
 
 //Should search in path, if present, then it would execute the program
@@ -50,6 +50,17 @@ char *findFullPath(char *name, char **sources, int n)
 
 //Support arguments for each program separately
 
+void fileProgram(char *arguments[])
+{
+	char c;
+	int f = open(arguments[1], O_APPEND | O_WRONLY | O_CREAT, 0777);
+	while (read(0, &c, sizeof(c)) > 0)
+	{
+		write(f, &c, sizeof(c));
+		write(1, &c, sizeof(c));
+	}
+}
+
 void recursiveExecutor(char *programs[], int index, int numberOfPrograms, int fd[][2], char ***argumentList)
 {
 
@@ -62,7 +73,7 @@ void recursiveExecutor(char *programs[], int index, int numberOfPrograms, int fd
 
 	if (fork() == 0)
 	{
-		int logIntFD = open("LogInt.txt", O_APPEND|O_CREAT|O_WRONLY);
+		int logIntFD = open("LogInt.txt", O_APPEND | O_CREAT | O_WRONLY);
 		// printf("LOGGING FD IS: %d\n", logIntFD);
 		if (index < numberOfPrograms - 1)
 		{
@@ -75,27 +86,26 @@ void recursiveExecutor(char *programs[], int index, int numberOfPrograms, int fd
 		{
 
 			recursiveExecutor(programs, index - 1, numberOfPrograms, fd, argumentList);
-			if(logInt)
+			if (logInt)
 			{
-				
-				char* s = (char*)malloc(128*sizeof(char));
-				s[0]='\0';
+
+				char *s = (char *)malloc(128 * sizeof(char));
+				s[0] = '\0';
 				s = strcat(s, "Output till ");
-				for(int i=0; i<=index; i++)
+				for (int i = 0; i <= index; i++)
 				{
-					
-					if(i>0)
+
+					if (i > 0)
 					{
-						s=strcat(s, " | ");
+						s = strcat(s, " | ");
 					}
-					s=strcat(s, programs[i]);
-					
+					s = strcat(s, programs[i]);
 				}
 
 				//Wherever >> replace it by program
 				//This printing should be along with arguments
 				s = strcat(s, " is:");
-				s=strcat(s, "\n");
+				s = strcat(s, "\n");
 				// printf("%s\n", s);
 				int k = write(logIntFD, s, strlen(s));
 
@@ -105,9 +115,9 @@ void recursiveExecutor(char *programs[], int index, int numberOfPrograms, int fd
 				int t_p[2];
 				pipe(t_p);
 				close(fd[index - 1][1]);
-				while(read(fd[index-1][0], &b, sizeof(b))>0)
+				while (read(fd[index - 1][0], &b, sizeof(b)) > 0)
 				{
-					
+
 					write(logIntFD, &b, sizeof(b));
 					printf("%c", b);
 					write(t_p[1], &b, sizeof(b));
@@ -115,9 +125,8 @@ void recursiveExecutor(char *programs[], int index, int numberOfPrograms, int fd
 
 				printf("ENDED READING PIPE\n");
 
-				fd[index-1][0] = t_p[0];
-				fd[index-1][1] = t_p[1];
-
+				fd[index - 1][0] = t_p[0];
+				fd[index - 1][1] = t_p[1];
 			}
 			close(0);
 			dup(fd[index - 1][0]);
@@ -128,7 +137,15 @@ void recursiveExecutor(char *programs[], int index, int numberOfPrograms, int fd
 
 		// execlp(findFullPath(programs[index], defaultPaths, numberOfPaths), programs[index], NULL);
 		close(logIntFD);
-		execve(findFullPath(programs[index], defaultPaths, numberOfPaths), argumentList[index], NULL);
+		if (strcmp(programs[index], ">>") == 0)
+		{
+			fileProgram(argumentList[index]);
+		}
+
+		else
+		{
+			execve(findFullPath(programs[index], defaultPaths, numberOfPaths), argumentList[index], NULL);
+		}
 	}
 
 	else
@@ -202,23 +219,25 @@ void processCommand(char *command)
 	}
 
 	//have separate argument list for each
-	char **args[pipedcount + 1];
-	char **pipedprograms = (char **)malloc((pipedcount + 1) * sizeof(char *));
+
+	int numberOfPrograms = pipedcount + 1 + filecount;
+	char **args[numberOfPrograms];
+	char **pipedprograms = (char **)malloc((numberOfPrograms) * sizeof(char *));
 	char **redirectedfiles = (char **)malloc(filecount * sizeof(char *));
-	for (int i = 0; i < pipedcount + 1; i++)
+	for (int i = 0; i < numberOfPrograms; i++)
 	{
 		args[i] = (char **)malloc((MAXARGS) * sizeof(char *));
 		// memcpy(args[i], NULL, MAXARGS * sizeof(char *));
-		for(int j=0; j< MAXARGS; j++)
+		for (int j = 0; j < MAXARGS; j++)
 		{
 			args[i][j] = NULL;
 		}
 	}
 
 	int pipedindex = 0, fileindex = 0, currentProgramIndex = 0;
-	int argsindex[pipedcount + 1];
+	int argsindex[numberOfPrograms];
 
-	for (int i = 0; i < pipedcount + 1; i++)
+	for (int i = 0; i < numberOfPrograms; i++)
 	{
 		argsindex[i] = 0;
 	}
@@ -242,7 +261,13 @@ void processCommand(char *command)
 
 		else if (strcmp(tokens[j], ">>") == 0)
 		{
-			redirectedfiles[fileindex++] = tokens[j + 1];
+			// currentProgramIndex++
+			pipedprograms[pipedindex] = tokens[j];
+			currentProgramIndex = pipedindex;
+			args[currentProgramIndex][argsindex[currentProgramIndex]++] = tokens[j];
+			args[currentProgramIndex][argsindex[currentProgramIndex]++] = tokens[j + 1];
+			pipedindex++;
+			// redirectedfiles[fileindex++] = tokens[j + 1];
 			j++;
 		}
 
@@ -308,4 +333,7 @@ int main()
 	//Improve tokenization
 	//Process both pipe and redirection together
 	//Fix input bug
+
+	//Why grep "" not wokring
+	//CHeck permissions
 }
