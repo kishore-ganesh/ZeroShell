@@ -6,7 +6,7 @@
 #include <sys/wait.h>
 #include <dirent.h>
 #include<fcntl.h>
-
+#include<errno.h>
 #define MAXARGS 128
 
 //Should search in path, if present, then it would execute the program
@@ -62,6 +62,8 @@ void recursiveExecutor(char *programs[], int index, int numberOfPrograms, int fd
 
 	if (fork() == 0)
 	{
+		int logIntFD = open("LogInt.txt", O_APPEND|O_CREAT|O_WRONLY);
+		// printf("LOGGING FD IS: %d\n", logIntFD);
 		if (index < numberOfPrograms - 1)
 		{
 			close(1);
@@ -75,21 +77,30 @@ void recursiveExecutor(char *programs[], int index, int numberOfPrograms, int fd
 			recursiveExecutor(programs, index - 1, numberOfPrograms, fd, argumentList);
 			if(logInt)
 			{
-				int logIntFD = open("LogInt.txt", O_APPEND|O_CREAT);
 				
-				char s[512];
+				char* s = (char*)malloc(128*sizeof(char));
 				s[0]='\0';
+				s = strcat(s, "Output till ");
 				for(int i=0; i<=index; i++)
 				{
 					
-					if(index>0)
+					if(i>0)
 					{
-						strcat(s, "|");
+						s=strcat(s, " | ");
 					}
-					strcat(s, programs[i]);
+					s=strcat(s, programs[i]);
+					
 				}
 
-				write(logIntFD, s, strlen(s)+1);
+				//Wherever >> replace it by program
+				//This printing should be along with arguments
+				s = strcat(s, " is:");
+				s=strcat(s, "\n");
+				// printf("%s\n", s);
+				int k = write(logIntFD, s, strlen(s));
+
+				// printf("WRITTEN %d\n", k);
+				// printf("ERROR IS: %d\n", errno);
 				char b;
 				int t_p[2];
 				pipe(t_p);
@@ -112,9 +123,11 @@ void recursiveExecutor(char *programs[], int index, int numberOfPrograms, int fd
 			dup(fd[index - 1][0]);
 			close(fd[index - 1][1]);
 			close(fd[index - 1][0]);
+			//also log last output
 		}
 
 		// execlp(findFullPath(programs[index], defaultPaths, numberOfPaths), programs[index], NULL);
+		close(logIntFD);
 		execve(findFullPath(programs[index], defaultPaths, numberOfPaths), argumentList[index], NULL);
 	}
 
