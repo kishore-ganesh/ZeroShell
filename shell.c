@@ -11,7 +11,7 @@
 
 //Should search in path, if present, then it would execute the program
 
-char *defaultPaths[] = {"/usr/bin/", "/bin/"};
+char *defaultPaths[] = {"/usr/bin/", "/bin/",};
 int numberOfPaths = 2;
 int logComm = 0, logInt = 0;
 int checkIfFileExists(char *path, char *name)
@@ -59,6 +59,8 @@ void fileProgram(char *arguments[])
 		write(f, &c, sizeof(c));
 		write(1, &c, sizeof(c));
 	}
+
+	printf("ENDED WRITING FILE\n");
 }
 
 void recursiveExecutor(char *programs[], int index, int numberOfPrograms, int fd[][2], char ***argumentList)
@@ -140,6 +142,7 @@ void recursiveExecutor(char *programs[], int index, int numberOfPrograms, int fd
 		if (strcmp(programs[index], ">>") == 0)
 		{
 			fileProgram(argumentList[index]);
+			exit(0);
 		}
 
 		else
@@ -287,7 +290,9 @@ int main()
 	{
 		char command[256];
 		printf("ENTER COMMAND\n");
+		
 		scanf(" %[^\n]s", command);
+		
 		if (strcmp("EXIT", command) == 0)
 		{
 			break;
@@ -336,4 +341,7 @@ int main()
 
 	//Why grep "" not wokring
 	//CHeck permissions
+	//Why do we need to type exit twice
+
+	//First create file then ls
 }
